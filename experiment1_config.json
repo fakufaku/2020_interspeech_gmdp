@@ -1,0 +1,19 @@
+{
+  "metadata_fn": "./data/metadata.json",
+
+  "stft": {
+    "nfft": 4096,
+    "hop": 1024,
+    "window": "hamming"
+  },
+
+  "ref_mic": 0,
+
+  "minimum_distortion": {
+    "p_list": [0.1, 2.0, 0.1],
+    "kwargs": {
+      "rtol": 1e-5,
+      "max_iter": 100
+    }
+  }
+}
