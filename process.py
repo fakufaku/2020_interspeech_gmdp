@@ -125,9 +125,11 @@ def process(args):
                 Y, X[:, :, ref_mic], p=p, q=q, **kwargs
             )
 
-            y, t["sdr"], t["sir"], _ = reconstruct_evaluate(
+            y, sdr, sir, _ = reconstruct_evaluate(
                 ref, Z, nfft, hop, win=win_s
             )
+            t["sdr"] = sdr.tolist()
+            t["sir"] = sir.tolist()
             results.append(t.copy())
 
     return results

@@ -1,5 +1,6 @@
 import argparse
 import json
+import datetime
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -53,6 +54,9 @@ if __name__ == "__main__":
     if args.test:
         sim_args = sim_args[:2]
 
+    # date of simulation in string format
+    date_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
     all_results = []
 
     if args.seq:
@@ -64,3 +68,8 @@ if __name__ == "__main__":
             results = p.map(process, sim_args)
             for r in results:
                 all_results += r
+
+    filename = f"{date_str}_smd_results.json"
+    with open(filename, "w") as f:
+        json.dump(all_results, f)
+
