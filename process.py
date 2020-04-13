@@ -101,13 +101,15 @@ def process(args):
 
     # Evaluation of raw signal
     t["proj_algo"] = "None"
-    y, t["sdr"], t["sir"], _ = reconstruct_evaluate(ref, Y, nfft, hop, win=win_s)
+    y, sdr, sir, _ = reconstruct_evaluate(ref, Y, nfft, hop, win=win_s)
+    t["sdr"], t["sir"] = sdr.tolist(), sir.tolist()
     results.append(t.copy())
 
     # projection back
     t["proj_algo"] = "projection_back"
     Z = bss_scale.projection_back(Y, X[:, :, ref_mic])
-    y, t["sdr"], t["sir"], _ = reconstruct_evaluate(ref, Z, nfft, hop, win=win_s)
+    y, sdr, sir, _ = reconstruct_evaluate(ref, Z, nfft, hop, win=win_s)
+    t["sdr"], t["sir"] = sdr.tolist(), sir.tolist()
     results.append(t.copy())
 
     # minimum distortion
