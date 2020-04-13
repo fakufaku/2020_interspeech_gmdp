@@ -40,20 +40,16 @@ def reconstruct_evaluate(ref, Y, nfft, hop, win=None):
     return y[:, perm], sdr, sir, sar
 
 
-def process(args):
+def process(args, config):
 
-    n_channels, room_id, bss_algo, config_fn = args
+    n_channels, room_id, bss_algo = args
 
     if mkl_available:
         mkl.set_num_threads_local(1)
 
-    config_fn = Path(config_fn)
-    dataset_dir = Path(*config_fn.absolute().parts[:-1])
-
-    with open(config_fn, "r") as f:
-        config = json.load(f)
-
     ref_mic = config["ref_mic"]
+    metadata_fn = Path(config["metadata_fn"])
+    dataset_dir = Path(*metadata_fn.absolute().parts[:-2])
 
     with open(config["metadata_fn"], "r") as f:
         metadata = json.load(f)
