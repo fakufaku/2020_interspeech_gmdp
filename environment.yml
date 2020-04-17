@@ -1,0 +1,10 @@
+name: sparse_projection_back
+dependencies:
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - pip
+  - seaborn
+  - pip:
+    - repsimtools

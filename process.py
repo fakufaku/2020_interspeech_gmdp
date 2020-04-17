@@ -111,8 +111,8 @@ def process(args, config):
     # minimum distortion
     lo, hi, step = config["minimum_distortion"]["p_list"]
     kwargs = config["minimum_distortion"]["kwargs"]
-    for p in np.arange(lo, hi, step):
-        for q in np.arange(p, hi, step):
+    for p in np.arange(lo, hi + step, step):
+        for q in np.arange(p, hi + step, step):
             t["p"], t["q"], t["proj_algo"] = (
                 f"{p:.1f}",
                 f"{q:.1f}",
