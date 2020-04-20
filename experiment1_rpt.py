@@ -82,6 +82,6 @@ if __name__ == "__main__":
         gen_args,
         func_init=init,
         base_dir=base_dir,
-        results_dir="data/",
+        results_dir="sim_results/",
         description="Simulation for OverIVA",
     )

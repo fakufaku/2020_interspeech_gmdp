@@ -109,10 +109,11 @@ def process(args, config):
     results.append(t.copy())
 
     # minimum distortion
-    lo, hi, step = config["minimum_distortion"]["p_list"]
+    lo, hi, n_steps = config["minimum_distortion"]["p_list"]
+    p_vals = np.linspace(lo, hi, n_steps)
     kwargs = config["minimum_distortion"]["kwargs"]
-    for p in np.arange(lo, hi + step, step):
-        for q in np.arange(p, hi + step, step):
+    for ip, p in enumerate(p_vals):
+        for q in p_vals[ip:]:
             t["p"], t["q"], t["proj_algo"] = (
                 f"{p:.1f}",
                 f"{q:.1f}",

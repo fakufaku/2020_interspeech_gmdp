@@ -126,7 +126,7 @@ def minimum_distortion(
     """
 
     # by default we do the regular minimum distortion
-    if p is None or (p == 2.0 and q is None):
+    if p is None or (p == 2.0 and (q is None or p == q)):
         return minimum_distortion_l2(Y, ref), 1
 
     n_frames, n_freq, n_channels = Y.shape

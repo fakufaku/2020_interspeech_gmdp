@@ -10,7 +10,7 @@
   "ref_mic": 0,
 
   "minimum_distortion": {
-    "p_list": [0.1, 2.0, 0.1],
+    "p_list": [0.1, 2.0, 20],
     "kwargs": {
       "rtol": 1e-5,
       "max_iter": 100
