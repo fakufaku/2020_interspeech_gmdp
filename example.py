@@ -129,6 +129,7 @@ if __name__ == "__main__":
         Y, n_iter = bss_scale.minimum_distortion(
             Y, X[:, :, REF_MIC], p=args.p, q=args.q
         )
+        print("minimum distortion iterations:", n_iter)
     elif args.algo not in dereverb_algos:
         Y = bss_scale.projection_back(Y, X[:, :, REF_MIC])
 

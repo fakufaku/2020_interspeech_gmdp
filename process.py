@@ -60,7 +60,7 @@ def process(args, config):
 
     ref_mic = config["ref_mic"]
     metadata_fn = Path(config["metadata_fn"])
-    dataset_dir = Path(*metadata_fn.absolute().parts[:-2])
+    dataset_dir = metadata_fn.parent
 
     with open(config["metadata_fn"], "r") as f:
         metadata = json.load(f)
@@ -73,15 +73,15 @@ def process(args, config):
 
     # add the noise
     sigma_src = np.std(mix)
-    sigma_n = sigma_src * 10 ** (-args.snr / 20)
+    sigma_n = sigma_src * 10 ** (-config["snr"] / 20)
     mix += np.random.randn(*mix.shape) * sigma_n
 
     # the reference
     if bss_algo_name in dereverb_algos:
         # for dereverberation algorithms we use the anechoic reference signal
-        fn_ref = dataset_dir / rooms[room_id]["anechoic_filenames"][REF_MIC]
+        fn_ref = dataset_dir / rooms[room_id]["anechoic_filenames"][config["ref_mic"]]
     else:
-        fn_ref = dataset_dir / rooms[room_id]["src_filenames"][REF_MIC]
+        fn_ref = dataset_dir / rooms[room_id]["src_filenames"][config["ref_mic"]]
     fs, ref = load_audio(fn_ref)
 
     # STFT parameters
@@ -102,15 +102,17 @@ def process(args, config):
 
     runtime_bss = time.perf_counter()
     if bss_algo_name == "fastmnmf":
-        Y = bss_algorithms[bss_name](X, n_iter=n_iter_p_ch * n_channels, **bss_kwargs)
+        Y = bss_algorithms[bss_algo_name](
+            X, n_iter=n_iter_p_ch * n_channels, **bss_kwargs
+        )
     elif bss_algo_name in dereverb_algos:
-        Y, Y_pb, runtime_pb = bss_algorithms[bss_name](
+        Y, Y_pb, runtime_pb = bss_algorithms[bss_algo_name](
             X, n_iter=n_iter_p_ch * n_channels, proj_back_both=True, **bss_kwargs
         )
         # adjust start time to remove the projection back
         runtime_bss += runtime_pb
     else:
-        Y = bss_algorithms[bss_name](
+        Y = bss_algorithms[bss_algo_name](
             X, n_iter=n_iter_p_ch * n_channels, proj_back=False, **bss_kwargs
         )
     runtime_bss = time.perf_counter() - runtime_bss

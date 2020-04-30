@@ -9,5 +9,6 @@ dependencies:
   - pip
   - seaborn
   - pip:
+    - mir_eval
     - repsimtools
     - pyroomacoustics

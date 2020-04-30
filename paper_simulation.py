@@ -48,6 +48,8 @@ def one_loop(args):
     sys.path.append(parameters["base_dir"])
     from process import process
 
+    res = process(args, parameters)
+    """
     try:
         res = process(args, parameters)
 
@@ -70,6 +72,7 @@ def one_loop(args):
             f.write(",\n")
 
         res = []
+    """
 
     return res
 
