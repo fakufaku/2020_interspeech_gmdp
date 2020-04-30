@@ -2,9 +2,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+from mir_eval.separation import bss_eval_sources
 
 import bss_scale
 import pyroomacoustics as pra
+from dereverb_separation import ilrma_t, kagami
 from helper import load_audio, save_audio
 from metrics import si_bss_eval
 from pyroomacoustics.transform import stft
@@ -19,11 +21,13 @@ except ImportError:
 bss_algorithms = {
     "auxiva": pra.bss.auxiva,
     "ilrma": pra.bss.ilrma,
-    # "fastmnmf": pra.bss.fastmnmf,
+    "ilrma_t": ilrma_t,
 }
 
+dereverb_algos = ["ilrma_t", "kagami"]
 
-def reconstruct_evaluate(ref, Y, nfft, hop, win=None):
+
+def reconstruct_evaluate(ref, Y, nfft, hop, win=None, si_metric=True):
     """
     Apply iSTFT and then evaluate the SI-BSS_EVAL metrics
     """
@@ -35,7 +39,10 @@ def reconstruct_evaluate(ref, Y, nfft, hop, win=None):
 
     # SI-BSS_EVAL
     m = np.minimum(ref.shape[0], y.shape[0])
-    sdr, sir, sar, perm = si_bss_eval(ref[:m, :], y[:m, :])
+    if si_metric:
+        sdr, sir, sar, perm = si_bss_eval(ref[:m, :], y[:m, :])
+    else:
+        sdr, sir, sar, perm = bss_eval_sources(ref[:m, :].T, y[:m, :].T)
 
     return y[:, perm], sdr, sir, sar
 
@@ -77,10 +84,19 @@ def process(args, config):
     X = stft.analysis(mix, nfft, hop, win=win_a)
 
     # Separation
-    if bss_algo != "fastmnmf":
-        Y = bss_algorithms[bss_algo](X, n_iter=10 * n_channels, proj_back=False)
+    bss_name = config["bss_algorithms"][bss_algo]["name"]
+    bss_kwargs = config["bss_algorithms"][bss_algo]["kwargs"]
+    n_iter_p_ch = config["bss_algorithms"][bss_algo]["n_iter_per_channel"]
+    if bss_algo == "fastmnmf":
+        Y = bss_algorithms[bss_name](X, n_iter=n_iter_p_ch * n_channels, **bss_kwargs)
+    elif bss_algo in dereverb_algos:
+        Y, Y_pb = bss_algorithms[bss_name](
+            X, n_iter=n_iter_p_ch * n_channels, proj_back_both=True, **bss_kwargs
+        )
     else:
-        Y = bss_algorithms[bss_algo](X, n_iter=10 * n_channels)
+        Y = bss_algorithms[bss_name](
+            X, n_iter=n_iter_p_ch * n_channels, proj_back=False, **bss_kwargs
+        )
 
     results = []
     t = {
@@ -103,7 +119,10 @@ def process(args, config):
 
     # projection back
     t["proj_algo"] = "projection_back"
-    Z = bss_scale.projection_back(Y, X[:, :, ref_mic])
+    if bss_algo in dereverb_algos:
+        Z = Y_pb
+    else:
+        Z = bss_scale.projection_back(Y, X[:, :, ref_mic])
     y, sdr, sir, _ = reconstruct_evaluate(ref, Z, nfft, hop, win=win_s)
     t["sdr"], t["sir"] = sdr.tolist(), sir.tolist()
     results.append(t.copy())
@@ -124,9 +143,7 @@ def process(args, config):
                 Y, X[:, :, ref_mic], p=p, q=q, **kwargs
             )
 
-            y, sdr, sir, _ = reconstruct_evaluate(
-                ref, Z, nfft, hop, win=win_s
-            )
+            y, sdr, sir, _ = reconstruct_evaluate(ref, Z, nfft, hop, win=win_s)
             t["sdr"] = sdr.tolist()
             t["sir"] = sir.tolist()
             results.append(t.copy())

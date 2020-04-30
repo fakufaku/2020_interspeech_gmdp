@@ -1,0 +1,3 @@
+[submodule "bss_speech_dataset"]
+	path = bss_speech_dataset
+	url = https://github.com/fakufaku/bss_speech_dataset.git

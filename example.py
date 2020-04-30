@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +24,7 @@ algorithms = {
 
 dereverb_algos = ["ilrma_t", "kagami"]
 
-DATA_DIR = Path("data")
+DATA_DIR = Path("bss_speech_dataset/data")
 DATA_META = DATA_DIR / "metadata.json"
 REF_MIC = 0
 RTOL = 1e-5
@@ -63,6 +64,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-r", "--room", default=0, type=int, help="Room number")
     parser.add_argument("-b", "--block", default=4096, type=int, help="STFT frame size")
+    parser.add_argument("--snr", default=30, type=float, help="Signal-to-Noise Ratio")
     args = parser.parse_args()
 
     rooms = metadata[f"{args.mics}_channels"]
@@ -77,6 +79,10 @@ if __name__ == "__main__":
     fn_mix = DATA_DIR / rooms[args.room]["mix_filename"]
     fs, mix = wavfile.read(fn_mix)
     mix = mix.astype(np.float64) / 2 ** 15
+
+    # add some noise
+    sigma_n = np.std(mix) * 10 ** (-args.snr / 20)
+    mix += np.random.randn(*mix.shape) * sigma_n
 
     # the reference
     if args.algo in dereverb_algos:
@@ -96,16 +102,24 @@ if __name__ == "__main__":
     # STFT
     X = stft.analysis(mix, args.block, hop, win=win_a)
 
+    t1 = time.perf_counter()
+
     # Separation
     if args.algo == "fastmnmf":
         Y = algorithms[args.algo](X, n_iter=30)
     elif args.algo in dereverb_algos:
         if args.p is None:
-            Y = algorithms[args.algo](X, n_iter=30, n_taps=6, proj_back=True)
+            Y = algorithms[args.algo](
+                X, n_iter=30, n_taps=6, n_delays=2, proj_back=True
+            )
         else:
-            Y = algorithms[args.algo](X, n_iter=30, n_taps=6, proj_back=False)
+            Y = algorithms[args.algo](
+                X, n_iter=30, n_taps=6, n_delays=2, proj_back=False
+            )
     else:
         Y = algorithms[args.algo](X, n_iter=30, proj_back=False)
+
+    t2 = time.perf_counter()
 
     # Projection back
 
@@ -115,6 +129,8 @@ if __name__ == "__main__":
         )
     elif args.algo not in dereverb_algos:
         Y = bss_scale.projection_back(Y, X[:, :, REF_MIC])
+
+    t3 = time.perf_counter()
 
     # iSTFT
     y = stft.synthesis(Y, args.block, hop, win=win_s)
@@ -126,10 +142,17 @@ if __name__ == "__main__":
     m = np.minimum(ref.shape[0], y.shape[0])
 
     # scale invaliant metric
-    sdr, sir, sar, perm = si_bss_eval(ref[:m, :], y[:m, :])
+    # sdr, sir, sar, perm = si_bss_eval(ref[:m, :], y[:m, :])
 
     # conventional metric
-    # sdr, sir, sar, perm = bss_eval_sources(ref[:m, :].T, y[:m, :].T)
+    sdr, sir, sar, perm = bss_eval_sources(ref[:m, :].T, y[:m, :].T)
+
+    wavfile.write("example_mix.wav", fs, mix)
+    wavfile.write("example_ref.wav", fs, ref[:m, :])
+    wavfile.write("example_output.wav", fs, y[:m, :])
 
     # Reorder the signals
-    print(sdr)
+    print("SDR:", sdr)
+    print("SIR:", sir)
+    print(f"Separation time: {t2 - t1:.3f} s")
+    print(f"Proj. back time: {t3 - t2:.3f} s")

@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import scipy as sp
 
@@ -169,18 +171,20 @@ def ilrma_t_iteration(
 
     x_hat = np.reshape(x, (fftMax, frameNum, xTapNum * micNum))
 
-    costOrgByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
-    costOrg = np.average(costOrgByFreq)
+    # costOrgByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
+    # costOrg = np.average(costOrgByFreq)
 
     if fixB == False:
         b_temp = ilrma_t_b_iteration(y, b, v, eps)
         # dを更新する
 
+        """
         d_temp = np.einsum("bst,fsb->fts", v, b_temp)
 
         costTempByFreq = log_likelihood_ilmra_t_by_frequency(
             y, P[:, 0, :, :], d_temp, eps
         )
+        """
 
         if use_increase_constraint == True:
             for freq in range(fftMax):
@@ -192,8 +196,10 @@ def ilrma_t_iteration(
     # 時間周波数分散
     d = np.einsum("bst,fsb->fts", v, b)
 
+    """
     costBByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
     costB = np.average(costBByFreq)
+    """
 
     if fixV == False:
         # y: fftMax,frameNum,micNum
@@ -204,9 +210,11 @@ def ilrma_t_iteration(
 
         d_temp = np.einsum("bst,fsb->fts", v_temp, b)
 
+        """
         costTempByFreq = log_likelihood_ilmra_t_by_frequency(
             y, P[:, 0, :, :], d_temp, eps
         )
+        """
 
         if use_increase_constraint == True:
             for freq in range(fftMax):
@@ -217,22 +225,29 @@ def ilrma_t_iteration(
 
     d = np.einsum("bst,fsb->fts", v, b)
 
+    """
     costVByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
     costV = np.average(costVByFreq)
+    """
 
     # フィルタを求める。
     IP1 = True
     IP2 = False
     if fixP == False and IP1 == True:
 
-        G_hat = np.einsum(
-            "fts,ftm,ftn->ftsmn", 1.0 / np.maximum(d, eps), x_hat, np.conjugate(x_hat)
-        )
-        G_hat = np.average(G_hat, axis=1)  # fsmn
-        # G_hat_eps=condition_covariance(G_hat,eps) #fsmn
-        inv_G_hat = np.linalg.pinv(G_hat)
+        x_hat_loc = x_hat.transpose([0, 2, 1])  # fst
+        r_inv = 1.0 / np.maximum(d.transpose([0, 2, 1]), eps)
+
         # sss
         for n in range(sourceNum):
+
+            G_hat_loc = (
+                (x_hat_loc * r_inv[:, n, None, :])
+                @ np.conj(x_hat_loc.swapaxes(-1, -2))
+                / x_hat_loc.shape[-1]
+            )
+            inv_G_hat_loc = np.linalg.pinv(G_hat_loc)
+
             # 分離フィルタの逆行列がPo,o^H-1
             P00_H = np.conjugate(P[:, 0, :, :])
             P00_H = np.transpose(P00_H, axes=[0, 2, 1])
@@ -242,11 +257,11 @@ def ilrma_t_iteration(
             a = A[:, :, n]  # fm
             # fsmn
             a_h_Ga = np.einsum(
-                "fm,fmn,fn->f", np.conjugate(a), inv_G_hat[:, n, :micNum, :micNum], a
+                "fm,fmn,fn->f", np.conjugate(a), inv_G_hat_loc[:, :micNum, :micNum], a
             )
             power = np.maximum(np.abs(a_h_Ga), eps)
             coef = np.sqrt(power)
-            Ga = np.einsum("fmn,fn->fm", inv_G_hat[:, n, :, :micNum], a)
+            Ga = np.einsum("fmn,fn->fm", inv_G_hat_loc[:, :, :micNum], a)
             p = np.einsum("fm,f->fm", Ga, 1.0 / np.maximum(coef, eps))
 
             detP = np.conjugate(np.linalg.det(P[:, 0, :, :]))  # f
@@ -286,7 +301,6 @@ def ilrma_t_iteration(
                 u2 = np.concatenate((u2, temp2[np.newaxis, :]), axis=0)
         u = np.concatenate((u1[:, np.newaxis, :], u2[:, np.newaxis, :]), axis=1)
         # sss
-        print(np.shape(u))
         for n in range(sourceNum):
             # fsmn
             V = inv_G_hat[:, n, :micNum, :micNum]
@@ -318,7 +332,7 @@ def ilrma_t_iteration(
     costPByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
     costP = np.average(costPByFreq)
 
-    return (y, y_pb, b, v, P, costOrg, costB, costV, costP)
+    return (y, y_pb, b, v, P)
 
 
 # KagamiICASSP2018を実装する
@@ -554,7 +568,7 @@ def ilrma_t_dereverb_separation(
     P = np.transpose(P, axes=[0, 1, 3, 2])
 
     for iter in range(iter_num):
-        y, y_pb, b, v, P, costOrg, costB, costV, costP = ilrma_t_iteration(
+        y, y_pb, b, v, P = ilrma_t_iteration(
             x_delay,
             b,
             v,
@@ -644,6 +658,7 @@ def dereverb_separate(
     n_taps=3,
     n_delays=1,
     algorithm="ilrma_t",
+    proj_back_both=False,
 ):
     """
     Performs joint dereverberation and separation of the input signal.
@@ -664,6 +679,8 @@ def dereverb_separate(
         ??? (but don't set to 0!)
     algorithm: str
         "ilrma_t" or "kagami"
+    proj_back_both: bool
+        if True, returns both the projected and not projected versions
     """
 
     # reshape input
@@ -693,10 +710,15 @@ def dereverb_separate(
     # Y_PB: shape (n_freq, n_src, n_frames, n_chan)
     # Y: shape (n_freq, n_frames, n_src)
 
+    Y = Y.transpose([1, 0, 2]).copy()
+    Y_pb = Y_pb[:, :, :, 0].transpose([2, 0, 1]).copy()
+
+    if proj_back_both:
+        return Y, Y_pb
     if proj_back:
-        return Y_pb[:, :, :, 0].transpose([2, 0, 1]).copy()
+        return Y_pb
     else:
-        return Y.transpose([1, 0, 2]).copy()
+        return Y
 
 
 def ilrma_t(X, **kwargs):
