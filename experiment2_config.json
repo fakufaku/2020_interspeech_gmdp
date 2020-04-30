@@ -1,0 +1,32 @@
+{
+  "metadata_fn": "./bss_speech_dataset/data/metadata.json",
+
+  "stft": {
+    "nfft": 512,
+    "hop": 256,
+    "window": "hamming"
+  },
+
+  "ref_mic": 0,
+  "si_metric": false,
+  "snr": 40,
+
+  "minimum_distortion": {
+    "p_list": [0.1, 2.0, 20],
+    "kwargs": {
+      "rtol": 1e-5,
+      "max_iter": 100
+    }
+  },
+
+  "bss_algorithms": {
+    "ilrma_t": {
+      "name": "ilrma_t",
+      "kwargs": {
+        "n_taps": 6,
+        "n_delays": 1
+      },
+      "n_iter_per_channel": 15
+    }
+  }
+}

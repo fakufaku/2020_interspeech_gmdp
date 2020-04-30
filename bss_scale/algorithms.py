@@ -85,7 +85,7 @@ def minimum_distortion_l2(Y, ref):
 
 
 def minimum_distortion(
-    Y, ref, p=None, q=None, rtol=1e-3, max_iter=100,
+    Y, ref, p=None, q=None, rtol=1e-2, max_iter=100,
 ):
     """
     This function computes the frequency-domain filter that minimizes the sum
@@ -135,7 +135,7 @@ def minimum_distortion(
 
     eps = 1e-15
 
-    prev_res = None
+    prev_c = None
 
     epoch = 0
     while epoch < max_iter:
@@ -145,9 +145,9 @@ def minimum_distortion(
         # the current error
         error = ref[:, :, None] - c * Y
         if q is None or p == q:
-            res, weights = lp_norm(error, p=p)
+            weights = lp_norm(error, p=p)
         else:
-            res, weights = lpq_norm(error, p=p, q=q, axis=1)
+            weights = lpq_norm(error, p=p, q=q, axis=1)
 
         # minimize
         num = np.sum(ref[:, :, None] * np.conj(Y) * weights, axis=0)
@@ -155,13 +155,13 @@ def minimum_distortion(
         c = num / np.maximum(eps, denom)
 
         # condition for termination
-        if prev_res is None:
-            prev_res = res
+        if prev_c is None:
+            prev_c = c
             continue
 
         # relative step length
-        delta = (prev_res - res) / prev_res
-        prev_res = res
+        delta = np.linalg.norm(c - prev_c) / np.linalg.norm(prev_c)
+        prev_c = c
         if delta < rtol:
             break
 
