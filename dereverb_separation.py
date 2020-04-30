@@ -178,14 +178,6 @@ def ilrma_t_iteration(
         b_temp = ilrma_t_b_iteration(y, b, v, eps)
         # dを更新する
 
-        """
-        d_temp = np.einsum("bst,fsb->fts", v, b_temp)
-
-        costTempByFreq = log_likelihood_ilmra_t_by_frequency(
-            y, P[:, 0, :, :], d_temp, eps
-        )
-        """
-
         if use_increase_constraint == True:
             for freq in range(fftMax):
                 if costOrgByFreq[freq] > costTempByFreq[freq]:
@@ -196,11 +188,6 @@ def ilrma_t_iteration(
     # 時間周波数分散
     d = np.einsum("bst,fsb->fts", v, b)
 
-    """
-    costBByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
-    costB = np.average(costBByFreq)
-    """
-
     if fixV == False:
         # y: fftMax,frameNum,micNum
         # b: fftMax,sourceNum,basis
@@ -210,12 +197,6 @@ def ilrma_t_iteration(
 
         d_temp = np.einsum("bst,fsb->fts", v_temp, b)
 
-        """
-        costTempByFreq = log_likelihood_ilmra_t_by_frequency(
-            y, P[:, 0, :, :], d_temp, eps
-        )
-        """
-
         if use_increase_constraint == True:
             for freq in range(fftMax):
                 if costBByFreq[freq] > costTempByFreq[freq]:
@@ -224,11 +205,6 @@ def ilrma_t_iteration(
             v = v_temp
 
     d = np.einsum("bst,fsb->fts", v, b)
-
-    """
-    costVByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
-    costV = np.average(costVByFreq)
-    """
 
     # フィルタを求める。
     IP1 = True
@@ -322,17 +298,7 @@ def ilrma_t_iteration(
 
     y = np.einsum("fdnm,ftdn->ftm", np.conjugate(P), x)
 
-    # Projection Back
-    P00_H = np.conjugate(P[:, 0, :, :])
-    P00_H = np.transpose(P00_H, axes=[0, 2, 1])
-    # P00_H_eps=condition_covariance(P00_H,eps)
-    A = np.linalg.pinv(P00_H)
-    y_pb = np.einsum("fts,fms->fstm", y, A)
-
-    costPByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
-    costP = np.average(costPByFreq)
-
-    return (y, y_pb, b, v, P)
+    return (y, b, v, P)
 
 
 # KagamiICASSP2018を実装する
@@ -568,7 +534,7 @@ def ilrma_t_dereverb_separation(
     P = np.transpose(P, axes=[0, 1, 3, 2])
 
     for iter in range(iter_num):
-        y, y_pb, b, v, P = ilrma_t_iteration(
+        y, b, v, P = ilrma_t_iteration(
             x_delay,
             b,
             v,
@@ -581,7 +547,7 @@ def ilrma_t_dereverb_separation(
         )
 
         # print(iter, costB, costV, costP)
-    return (y, y_pb)
+    return (y, P)
 
 
 # x: freq,frame,mic
@@ -687,7 +653,7 @@ def dereverb_separate(
     X = X.transpose([1, 0, 2]).copy()
 
     if algorithm == "ilrma_t":
-        Y, Y_pb = ilrma_t_dereverb_separation(
+        Y, P = ilrma_t_dereverb_separation(
             X,
             iter_num=n_iter,
             nmf_basis_num=n_components,
@@ -695,6 +661,16 @@ def dereverb_separate(
             delay_num=n_delays,
             eps=1.0e-18,
         )
+
+        # Projection Back
+        t_pb = time.perf_counter()
+        P00_H = np.conjugate(P[:, 0, :, :])
+        P00_H = np.transpose(P00_H, axes=[0, 2, 1])
+        # P00_H_eps=condition_covariance(P00_H,eps)
+        A = np.linalg.pinv(P00_H)
+        Y_pb = np.einsum("fts,fms->fstm", Y, A)
+        t_pb = time.perf_counter() - t_pb
+
     elif algorithm == "kagami":
         Y, Y_pb = kagami_dereverb_separation(
             X,
@@ -704,6 +680,7 @@ def dereverb_separate(
             delay_num=n_delays,
             eps=1.0e-18,
         )
+        t_pb = -1.0
     else:
         raise ValueError(f"Invalide algorithm {algorithm}")
 
@@ -714,7 +691,7 @@ def dereverb_separate(
     Y_pb = Y_pb[:, :, :, 0].transpose([2, 0, 1]).copy()
 
     if proj_back_both:
-        return Y, Y_pb
+        return Y, Y_pb, t_pb
     if proj_back:
         return Y_pb
     else:

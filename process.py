@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -51,6 +52,9 @@ def process(args, config):
 
     n_channels, room_id, bss_algo = args
 
+    # the name of the algorithm we'll use for bss
+    bss_algo_name = config["bss_algorithms"][bss_algo]["name"]
+
     if mkl_available:
         mkl.set_num_threads_local(1)
 
@@ -67,8 +71,17 @@ def process(args, config):
     fn_mix = dataset_dir / rooms[room_id]["mix_filename"]
     fs, mix = load_audio(fn_mix)
 
+    # add the noise
+    sigma_src = np.std(mix)
+    sigma_n = sigma_src * 10 ** (-args.snr / 20)
+    mix += np.random.randn(*mix.shape) * sigma_n
+
     # the reference
-    fn_ref = dataset_dir / rooms[room_id]["src_filenames"][ref_mic]
+    if bss_algo_name in dereverb_algos:
+        # for dereverberation algorithms we use the anechoic reference signal
+        fn_ref = dataset_dir / rooms[room_id]["anechoic_filenames"][REF_MIC]
+    else:
+        fn_ref = dataset_dir / rooms[room_id]["src_filenames"][REF_MIC]
     fs, ref = load_audio(fn_ref)
 
     # STFT parameters
@@ -84,26 +97,31 @@ def process(args, config):
     X = stft.analysis(mix, nfft, hop, win=win_a)
 
     # Separation
-    bss_name = config["bss_algorithms"][bss_algo]["name"]
     bss_kwargs = config["bss_algorithms"][bss_algo]["kwargs"]
     n_iter_p_ch = config["bss_algorithms"][bss_algo]["n_iter_per_channel"]
-    if bss_algo == "fastmnmf":
+
+    runtime_bss = time.perf_counter()
+    if bss_algo_name == "fastmnmf":
         Y = bss_algorithms[bss_name](X, n_iter=n_iter_p_ch * n_channels, **bss_kwargs)
-    elif bss_algo in dereverb_algos:
-        Y, Y_pb = bss_algorithms[bss_name](
+    elif bss_algo_name in dereverb_algos:
+        Y, Y_pb, runtime_pb = bss_algorithms[bss_name](
             X, n_iter=n_iter_p_ch * n_channels, proj_back_both=True, **bss_kwargs
         )
+        # adjust start time to remove the projection back
+        runtime_bss += runtime_pb
     else:
         Y = bss_algorithms[bss_name](
             X, n_iter=n_iter_p_ch * n_channels, proj_back=False, **bss_kwargs
         )
+    runtime_bss = time.perf_counter() - runtime_bss
 
-    results = []
+    results = [{"bss_runtime": {"bss_algo": bss_algo, "runtime": runtime_bss,}}]
     t = {
         "room_id": room_id,
         "n_channels": n_channels,
         "bss_algo": bss_algo,
         "proj_algo": None,
+        "runtime": 0.0,
         "sdr": None,
         "sir": None,
         "p": None,
@@ -113,7 +131,9 @@ def process(args, config):
 
     # Evaluation of raw signal
     t["proj_algo"] = "None"
-    y, sdr, sir, _ = reconstruct_evaluate(ref, Y, nfft, hop, win=win_s)
+    y, sdr, sir, _ = reconstruct_evaluate(
+        ref, Y, nfft, hop, win=win_s, si_metric=config["si_metric"]
+    )
     t["sdr"], t["sir"] = sdr.tolist(), sir.tolist()
     results.append(t.copy())
 
@@ -122,9 +142,14 @@ def process(args, config):
     if bss_algo in dereverb_algos:
         Z = Y_pb
     else:
+        runtime_pb = time.perf_counter()
         Z = bss_scale.projection_back(Y, X[:, :, ref_mic])
-    y, sdr, sir, _ = reconstruct_evaluate(ref, Z, nfft, hop, win=win_s)
+        runtime_pb = time.perf_counter() - runtime_pb
+    y, sdr, sir, _ = reconstruct_evaluate(
+        ref, Z, nfft, hop, win=win_s, si_metric=config["si_metric"]
+    )
     t["sdr"], t["sir"] = sdr.tolist(), sir.tolist()
+    t["runtime"] = runtime_pb
     results.append(t.copy())
 
     # minimum distortion
@@ -139,13 +164,18 @@ def process(args, config):
                 "minimum_distortion",
             )
 
+            runtime_md = time.perf_counter()
             Z, t["n_iter"] = bss_scale.minimum_distortion(
                 Y, X[:, :, ref_mic], p=p, q=q, **kwargs
             )
+            runtime_md = time.perf_counter() - runtime_md
 
-            y, sdr, sir, _ = reconstruct_evaluate(ref, Z, nfft, hop, win=win_s)
+            y, sdr, sir, _ = reconstruct_evaluate(
+                ref, Z, nfft, hop, win=win_s, si_metric=config["si_metric"]
+            )
             t["sdr"] = sdr.tolist()
             t["sir"] = sir.tolist()
+            t["runtime"] = runtime_md
             results.append(t.copy())
 
     return results

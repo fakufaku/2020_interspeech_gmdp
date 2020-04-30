@@ -81,8 +81,10 @@ if __name__ == "__main__":
     mix = mix.astype(np.float64) / 2 ** 15
 
     # add some noise
-    sigma_n = np.std(mix) * 10 ** (-args.snr / 20)
+    sigma_src = np.std(mix)
+    sigma_n = sigma_src * 10 ** (-args.snr / 20)
     mix += np.random.randn(*mix.shape) * sigma_n
+    print("SNR:", 10 * np.log10(sigma_src ** 2 / sigma_n ** 2))
 
     # the reference
     if args.algo in dereverb_algos:
