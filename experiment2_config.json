@@ -2,8 +2,8 @@
   "metadata_fn": "./bss_speech_dataset/data/metadata.json",
 
   "stft": {
-    "nfft": 512,
-    "hop": 256,
+    "nfft": 1024,
+    "hop": 512,
     "window": "hamming"
   },
 
@@ -23,6 +23,7 @@
     "ilrma_t": {
       "name": "ilrma_t",
       "kwargs": {
+        "n_components": 2,
         "n_taps": 3,
         "n_delays": 2
       },
