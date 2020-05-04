@@ -64,7 +64,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-r", "--room", default=0, type=int, help="Room number")
     parser.add_argument("-b", "--block", default=4096, type=int, help="STFT frame size")
-    parser.add_argument("--snr", default=30, type=float, help="Signal-to-Noise Ratio")
+    parser.add_argument("--snr", default=40, type=float, help="Signal-to-Noise Ratio")
     args = parser.parse_args()
 
     rooms = metadata[f"{args.mics}_channels"]
@@ -112,11 +112,11 @@ if __name__ == "__main__":
     elif args.algo in dereverb_algos:
         if args.p is None:
             Y = algorithms[args.algo](
-                X, n_iter=30, n_taps=6, n_delays=2, proj_back=True
+                X, n_iter=15 * args.mics, n_taps=3, n_delays=2, proj_back=True
             )
         else:
             Y = algorithms[args.algo](
-                X, n_iter=30, n_taps=6, n_delays=2, proj_back=False
+                X, n_iter=15 * args.mics, n_taps=3, n_delays=2, proj_back=False
             )
     else:
         Y = algorithms[args.algo](X, n_iter=30, proj_back=False)
