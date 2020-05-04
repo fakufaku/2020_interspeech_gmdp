@@ -1,11 +1,16 @@
 import argparse
 import json
+import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from repsimtools import (DirtyGitRepositoryError, InvalidGitRepositoryError,
+                         get_git_hash)
+
+OUTPUT_DIR = Path("figures")
 
 BEST_MAX_ITER = 10
 CLASSIC_P = "2.0"
@@ -194,19 +199,30 @@ def print_table(sub_data, best_params, metrics=[]):
     avgmet = average_metrics
 
     # now print this into a table that we can import in latex
-    print("\\text{Algo} & \\text{Channels} & \\text{{Metric}}", end="")
+
+    # First row has only the name of the algorithms
+    print(" & ", end="")
     for proj_algo in avgmet["proj_algo"].unique():
-        print(f" & \\text{{{proj_algo}}}", end="")
+        print(f" & \\multicolumn{{3}}{{c}}{{ {proj_algo} }} ", end="")
+    print(" \\\\")
+
+    # Second row has the parameter names (algo/channels) and the metric names
+    print("\\text{Algo} & \\text{Channels} ", end="")
+    for proj_algo in avgmet["proj_algo"].unique():
+        for metric in metrics:
+            print(f" & \\text{{ {metric} }}", end="")
     print(" \\\\")
 
     for bss_algo in avgmet["bss_algo"].unique():
-        for n_chan in avgmet["n_channels"].unique():
-            for metric in metrics:
-                print(
-                    f"\\text{{{bss_algo}}} & \\text{{{n_chan}}} & \\text{{{metric}}}",
-                    end="",
-                )
-                for proj_algo in avgmet["proj_algo"].unique():
+        for m, n_chan in enumerate(avgmet["n_channels"].unique()):
+
+            if m == 0:
+                print(f"\\text{{ {bss_algo} }} & \\text{{ {n_chan} }} ", end="")
+            else:
+                print(f" & \\text{{ {n_chan} }} ", end="")
+
+            for proj_algo in avgmet["proj_algo"].unique():
+                for metric in metrics:
                     val = avgmet[
                         (avgmet["bss_algo"] == bss_algo)
                         & (avgmet["n_channels"] == n_chan)
@@ -218,7 +234,7 @@ def print_table(sub_data, best_params, metrics=[]):
                         print(f" & {val:0.2f}", end="")
                     else:
                         print(f" & {val}", end="")
-                print(" \\\\")
+            print(" \\\\")
 
     return avgmet
 
@@ -229,6 +245,11 @@ if __name__ == "__main__":
         description="Sparse minimum distortion simulation results analaysis"
     )
     parser.add_argument("results_dir", type=Path, help="Location of simulation results")
+    parser.add_argument(
+        "--dummy",
+        action="store_true",
+        help="Allow to run with uncommited modif in the repo",
+    )
     args = parser.parse_args()
 
     with open(args.results_dir / "data.json") as f:
@@ -237,10 +258,39 @@ if __name__ == "__main__":
     with open(args.results_dir / "parameters.json") as f:
         params = json.load(f)
 
+    # create a unique output directory name
+    try:
+        plot_hash = get_git_hash(".")
+        git_dirty = False
+    except DirtyGitRepositoryError:
+        git_dirty = True
+        if args.dummy:
+            plot_hash = "dummy"
+        else:
+            raise DirtyGitRepositoryError(
+                "Uncommited changes. Commit first, or run with --dummy option"
+            )
+    except InvalidGitRepositoryError:
+        git_dirty = False
+        plot_hash = "nogit"
+
+    output_dir = OUTPUT_DIR / Path(
+        f"{params['_date']}_{params['name']}_sim_{params['_git_sha']}_plot_{plot_hash}"
+    )
+    if not OUTPUT_DIR.exists():
+        os.mkdir(OUTPUT_DIR)
+    if not output_dir.exists():
+        os.mkdir(output_dir)
+
     # concatenate all the results
     results = []
+    bss_runtimes = []
     for r in data:
-        results += r
+        for e in r:
+            if "bss_runtime" in e:
+                bss_runtimes.append(e["bss_runtime"])
+            else:
+                results.append(e)
 
     for r in results:
         for metric in ["sdr", "sir"]:
@@ -288,7 +338,7 @@ if __name__ == "__main__":
         fg.set_titles(template=f"{metric} " + "| {row_name} | mics={col_name}")
 
         for suffix in ["png", "pdf"]:
-            plt.savefig(f"figures/heatmaps_{metric}.{suffix}")
+            plt.savefig(output_dir / f"heatmaps_{metric}.{suffix}")
 
     """
     Now we will plot the box plots for key algorithms
