@@ -13,6 +13,20 @@ from dereverb_separation import ilrma_t, kagami
 from metrics import si_bss_eval
 from pyroomacoustics.transform import stft
 
+
+def auxiva_ilrma_t(X, n_iter=20, proj_back=True, auxiva_n_iter=30, **kwargs):
+
+    Y, W = pra.bss.auxiva(X, n_iter=auxiva_n_iter, return_filters=True, proj_back=False)
+
+    Y = ilrma_t(Y, n_iter=n_iter, proj_back=proj_back, **kwargs)
+
+    if proj_back:
+        A = np.linalg.inv(W)
+        Y = A[None, :, 0, :] * Y
+
+    return Y
+
+
 algorithms = {
     "auxiva": pra.bss.auxiva,
     "ilrma": pra.bss.ilrma,
@@ -20,9 +34,10 @@ algorithms = {
     "fastmnmf": pra.bss.fastmnmf,
     "ilrma_t": ilrma_t,
     "kagami": kagami,
+    "auxiva_ilrma_t": auxiva_ilrma_t,
 }
 
-dereverb_algos = ["ilrma_t", "kagami"]
+dereverb_algos = ["ilrma_t", "kagami", "auxiva_ilrma_t"]
 
 DATA_DIR = Path("bss_speech_dataset/data")
 DATA_META = DATA_DIR / "metadata.json"
@@ -73,6 +88,9 @@ if __name__ == "__main__":
         rooms
     ), f"Room must be between 0 and {len(rooms) - 1}"
 
+    t60 = rooms[args.room]["room_params"]["t60"]
+    print(f"Using room {args.room} with T60={t60:.3f}")
+
     # choose and read the audio files
 
     # the mixtures
@@ -112,16 +130,28 @@ if __name__ == "__main__":
     elif args.algo in dereverb_algos:
         if args.p is None:
             Y = algorithms[args.algo](
-                X, n_iter=15 * args.mics, n_taps=3, n_delays=2, proj_back=True
+                X,
+                n_iter=15 * args.mics,
+                n_taps=3,
+                n_delays=2,
+                n_components=1,
+                proj_back=True,
             )
         else:
             Y = algorithms[args.algo](
-                X, n_iter=15 * args.mics, n_taps=3, n_delays=2, proj_back=False
+                X,
+                n_iter=15 * args.mics,
+                n_taps=3,
+                n_delays=2,
+                n_components=1,
+                proj_back=False,
             )
     else:
         Y = algorithms[args.algo](X, n_iter=30, proj_back=False)
 
     t2 = time.perf_counter()
+
+    print(f"Separation time: {t2 - t1:.3f} s")
 
     # Projection back
 
@@ -135,6 +165,8 @@ if __name__ == "__main__":
 
     t3 = time.perf_counter()
 
+    print(f"Proj. back time: {t3 - t2:.3f} s")
+
     # iSTFT
     y = stft.synthesis(Y, args.block, hop, win=win_s)
     y = y[args.block - hop :]
@@ -144,11 +176,18 @@ if __name__ == "__main__":
     # Evaluate
     m = np.minimum(ref.shape[0], y.shape[0])
 
-    # scale invaliant metric
-    # sdr, sir, sar, perm = si_bss_eval(ref[:m, :], y[:m, :])
+    t4 = time.perf_counter()
 
-    # conventional metric
-    sdr, sir, sar, perm = bss_eval_sources(ref[:m, :].T, y[:m, :].T)
+    if args.algo in dereverb_algos:
+        # conventional metric
+        sdr, sir, sar, perm = bss_eval_sources(ref[:m, :].T, y[:m, :].T)
+    else:
+        # scale invaliant metric
+        sdr, sir, sar, perm = si_bss_eval(ref[:m, :], y[:m, :])
+
+    t5 = time.perf_counter()
+
+    print(f"Eval. back time: {t5 - t4:.3f} s")
 
     wavfile.write("example_mix.wav", fs, mix)
     wavfile.write("example_ref.wav", fs, ref[:m, :])
@@ -157,5 +196,3 @@ if __name__ == "__main__":
     # Reorder the signals
     print("SDR:", sdr)
     print("SIR:", sir)
-    print(f"Separation time: {t2 - t1:.3f} s")
-    print(f"Proj. back time: {t3 - t2:.3f} s")

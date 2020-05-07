@@ -174,20 +174,6 @@ def ilrma_t_iteration(
     # costOrgByFreq = log_likelihood_ilmra_t_by_frequency(y, P[:, 0, :, :], d, eps)
     # costOrg = np.average(costOrgByFreq)
 
-    if fixB == False:
-        b_temp = ilrma_t_b_iteration(y, b, v, eps)
-        # dを更新する
-
-        if use_increase_constraint == True:
-            for freq in range(fftMax):
-                if costOrgByFreq[freq] > costTempByFreq[freq]:
-                    b[freq, ...] = b_temp[freq, ...]
-        else:
-            b = b_temp
-
-    # 時間周波数分散
-    d = np.einsum("bst,fsb->fts", v, b)
-
     if fixV == False:
         # y: fftMax,frameNum,micNum
         # b: fftMax,sourceNum,basis
@@ -204,6 +190,20 @@ def ilrma_t_iteration(
         else:
             v = v_temp
 
+    d = np.einsum("bst,fsb->fts", v, b)
+
+    if fixB == False:
+        b_temp = ilrma_t_b_iteration(y, b, v, eps)
+        # dを更新する
+
+        if use_increase_constraint == True:
+            for freq in range(fftMax):
+                if costOrgByFreq[freq] > costTempByFreq[freq]:
+                    b[freq, ...] = b_temp[freq, ...]
+        else:
+            b = b_temp
+
+    # 時間周波数分散
     d = np.einsum("bst,fsb->fts", v, b)
 
     # フィルタを求める。
@@ -509,12 +509,16 @@ def ilrma_t_dereverb_separation(
     weight = np.random.uniform(size=fftMax * source_num * nmf_basis_num)
     weight = np.reshape(weight, [fftMax, source_num, nmf_basis_num])
 
+    # v: basis,sourceNum,frameNum
     v = np.einsum("fst,fsb->bst", v, weight)
     v_ave = np.mean(v, axis=2, keepdims=True)
     v = v / (v_ave + 1.0e-14)
     v = np.abs(v)
+    v = 0.2 * np.random.rand(nmf_basis_num, source_num, frameNum) + 0.8
 
-    b = np.ones(shape=(fftMax, source_num, nmf_basis_num))
+    # b: fftMax,sourceNum,basis
+    # b = np.ones(shape=(fftMax, source_num, nmf_basis_num))
+    b = 0.2 * np.random.rand(fftMax, source_num, nmf_basis_num) + 0.8
 
     W = np.zeros(shape=(fftMax, channels, (tap_num + 1) * channels), dtype=np.complex)
     W[:, :, :channels] = (
