@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import json
+import random
 import os
 import traceback
 from pathlib import Path
@@ -36,6 +37,8 @@ def gen_args(parameters):
             for bss_algo in parameters["bss_algorithms"].keys():
 
                 args.append([n_channels, room_id, bss_algo])
+
+    random.shuffle(args)
 
     return args
 

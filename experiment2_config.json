@@ -23,7 +23,7 @@
     "ilrma_t": {
       "name": "ilrma_t",
       "kwargs": {
-        "n_components": 2,
+        "n_components": 1,
         "n_taps": 3,
         "n_delays": 2
       },
