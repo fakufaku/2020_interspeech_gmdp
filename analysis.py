@@ -354,7 +354,7 @@ if __name__ == "__main__":
                 square=True,
             )
 
-            fg.set_titles(template=f"{metric} " + "| {row_name} | mics={col_name}")
+            fg.set_titles(template=f"{col_name} mics")
 
             for suffix in ["png", "pdf"]:
                 plt.savefig(output_dir / f"heatmaps_{bss_algo}_{metric}.{suffix}")
