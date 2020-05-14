@@ -1,4 +1,4 @@
-name: sparse_minimum_distortion
+name: gmdp
 dependencies:
   - python=3.7
   - numpy
