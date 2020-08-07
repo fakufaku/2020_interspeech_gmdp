@@ -19,7 +19,7 @@ blind source separation.
 
 ## Author
 
-[Robin Scheibler](http://robinscheibler.org) (firstname.name@gmail.org)
+[Robin Scheibler](http://robinscheibler.rg) (firstname.name@gmail.org)
 
 ## Run the experiments
 
@@ -31,8 +31,8 @@ We use [ipyparallel](https://ipyparallel.readthedocs.io/en/latest/) to paralleli
 
 ```bash
 # prepare the environment
-git clone --recursive https://git.linecorp.com/robin-scheibler/generalized_minimal_distortion_principle.git
-cd generalized_minimal_distortion_principle
+git clone --recursive https://github.com/fakufaku/2020_interspeech_gdmp.git
+cd 2020_interspeech_gdmp
 conda env create -f environment.yml
 conda activate gmdp
 
@@ -42,7 +42,7 @@ python ../config_dataset.json
 cd ..
 ```
 
-### Run
+### Run the Experiments
 
 ```bash
 # start the engines
@@ -52,8 +52,21 @@ ipcluster start --daemonize
 python ./paper_simulation.py ./experiment1_config.json
 
 # run experiment for ILRMA-T
-python ./paper_simulation.py ./experiment1_config.json
+python ./paper_simulation.py ./experiment2_config.json
 
 # stop the engines
 ipcluster stop
+```
+
+### Create the Tables and Figures
+
+In general, do the following
+```python
+python ./analysis.py ./sim_results/<results_folder>
+```
+
+To recreate the figures with the simulation results used in the paper do
+```python
+python ./analysis.py ./sim_results/20200511-112906_experiment1_config_102af93240
+python ./analysis.py ./sim_results/20200507-012736_experiment2_config_102af93240
 ```
