@@ -1,0 +1,4 @@
+.vim/
+*__pycache__/
+*.wav
+figures/

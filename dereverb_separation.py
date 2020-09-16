@@ -1,9 +1,40 @@
+# This file contains code to perform joint separation and dereverberation of
+# audio signals using the methods by Kagami et al., and Ikeshita et. al
+#
+# With the exception of the function "condition_covariance", the code in this
+# file is covered by the MIT License with the following copyright
+#
+# Copyright 2020 Masahito Togami, Robin Scheibler
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 import time
 
 import numpy as np
 import scipy as sp
 
 
+# The following function "condition_covariance" has been taken from
+# Jahn Heymann's code for nn-gev beamforming available at
+# https://github.com/fgnt/nn-gev
+# This function only falls under the Paderborn University open license
+# under terms state in the following document
+# https://github.com/fgnt/nn-gev/blob/master/LICENSE
 def condition_covariance(x, gamma):
     """see https://stt.msu.edu/users/mauryaas/Ashwini_JPEN.pdf (2.3)"""
     scale = gamma * np.trace(x) / x.shape[-1]

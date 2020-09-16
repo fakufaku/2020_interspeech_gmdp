@@ -61,12 +61,16 @@ ipcluster stop
 ### Create the Tables and Figures
 
 In general, do the following
-```python
+```bash
 python ./analysis.py ./sim_results/<results_folder>
 ```
 
 To recreate the figures with the simulation results used in the paper do
-```python
+```bash
 python ./analysis.py ./sim_results/20200511-112906_experiment1_config_102af93240
 python ./analysis.py ./sim_results/20200507-012736_experiment2_config_102af93240
 ```
+
+## License
+
+The code is released under MIT License.

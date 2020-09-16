@@ -1,0 +1,40 @@
+{
+  "metadata_fn": "./bss_speech_dataset/data/metadata.json",
+  "stft": {
+    "nfft": 4096,
+    "hop": 1024,
+    "window": "hamming"
+  },
+  "ref_mic": 0,
+  "si_metric": true,
+  "snr": 40,
+  "minimum_distortion": {
+    "p_list": [
+      0.1,
+      2.0,
+      20
+    ],
+    "kwargs": {
+      "rtol": 0.01,
+      "max_iter": 100
+    }
+  },
+  "bss_algorithms": {
+    "auxiva": {
+      "name": "auxiva",
+      "kwargs": {},
+      "n_iter_per_channel": 10
+    },
+    "ilrma": {
+      "name": "ilrma",
+      "kwargs": {
+        "n_components": 2
+      },
+      "n_iter_per_channel": 10
+    }
+  },
+  "name": "experiment1_config",
+  "_git_sha": "102af93240",
+  "_date": "20200511-112906",
+  "_parallel": true
+}
